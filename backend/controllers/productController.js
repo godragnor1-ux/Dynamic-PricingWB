@@ -23,6 +23,9 @@ exports.incrementViewCount = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
     
+    // Force dynamic price recalculation immediately
+    await pool.query('CALL UpdateDynamicPrices()');
+    
     res.json({ message: 'View count incremented successfully' });
   } catch (err) {
     console.error(err);

@@ -23,6 +23,7 @@ function App() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
+  const [checkoutProduct, setCheckoutProduct] = useState(null);
 
   const addToast = (message, type = 'success') => {
     const id = Date.now();
@@ -35,7 +36,7 @@ function App() {
 
   const fetchProducts = () => {
     setLoading(true);
-    fetch('http://localhost:5000/api/products')
+    fetch('http://localhost:5001/api/products')
       .then(res => res.json())
       .then(data => {
         setProducts(data);
@@ -53,7 +54,7 @@ function App() {
 
   const handleViewDetails = async (productId, productName) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/products/${productId}/view`, {
+      const response = await fetch(`http://localhost:5001/api/products/${productId}/view`, {
         method: 'POST',
       });
       if (response.ok) {
@@ -66,18 +67,23 @@ function App() {
     }
   };
 
-  const handleBuyNow = async (productId, productName) => {
+  const handleBuyNow = (product) => {
+    setCheckoutProduct(product);
+  };
+
+  const confirmPurchase = async () => {
+    if (!checkoutProduct) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/checkout`, {
+      const response = await fetch(`http://localhost:5001/api/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, quantity: 1 }),
+        body: JSON.stringify({ productId: checkoutProduct.product_id, quantity: 1 }),
       });
       
       const data = await response.json();
       
       if (response.ok) {
-        addToast(`Successfully purchased 1x ${productName}!`, 'success');
+        addToast(`Successfully purchased 1x ${checkoutProduct.name}!`, 'success');
         // Refresh products to show updated stock, sales, and price
         fetchProducts();
       } else {
@@ -85,6 +91,8 @@ function App() {
       }
     } catch (err) {
       console.error('Error checking out:', err);
+    } finally {
+      setCheckoutProduct(null);
     }
   };
 
@@ -104,6 +112,40 @@ function App() {
           <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => removeToast(toast.id)} />
         ))}
       </div>
+
+      {/* Checkout Modal */}
+      {checkoutProduct && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900 bg-opacity-60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            <div className="p-6 text-center sm:text-left">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirm Purchase</h3>
+              <p className="text-gray-500 mb-6">Are you sure you want to buy 1x <span className="font-semibold text-gray-800">{checkoutProduct.name}</span>?</p>
+              
+              <div className="bg-indigo-50 rounded-xl p-4 mb-6 border border-indigo-100">
+                <div className="flex justify-between items-center text-lg">
+                  <span className="font-medium text-indigo-900">Total Price:</span>
+                  <span className="text-2xl font-black text-indigo-600">₹{parseFloat(checkoutProduct.current_price).toFixed(2)}</span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => setCheckoutProduct(null)}
+                  className="flex-1 bg-white text-gray-700 border-2 border-gray-200 hover:border-gray-400 hover:bg-gray-50 py-3 px-4 rounded-xl font-bold transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmPurchase}
+                  className="flex-1 bg-indigo-600 text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 py-3 px-4 rounded-xl font-bold transition-all duration-200"
+                >
+                  Confirm Purchase
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
@@ -139,11 +181,11 @@ function App() {
                     <div className="flex flex-col items-end">
                       {currentPrice !== basePrice && (
                         <span className="text-sm text-gray-400 line-through mb-1">
-                          ${basePrice.toFixed(2)}
+                          ₹{basePrice.toFixed(2)}
                         </span>
                       )}
                       <span className={`text-3xl font-black tracking-tight ${priceColorClass}`}>
-                        ${currentPrice.toFixed(2)}
+                        ₹{currentPrice.toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -172,7 +214,7 @@ function App() {
                       View Details
                     </button>
                     <button 
-                      onClick={() => handleBuyNow(product.product_id, product.name)}
+                      onClick={() => handleBuyNow(product)}
                       disabled={product.stock_quantity <= 0}
                       className="flex-1 bg-indigo-600 text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 py-3 px-4 rounded-xl font-bold transition-all duration-200 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed"
                     >
