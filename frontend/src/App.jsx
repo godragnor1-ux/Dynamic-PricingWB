@@ -148,10 +148,45 @@ function App() {
       )}
 
       <div className="max-w-7xl mx-auto">
+        {/* Presentation Header */}
+        <div className="mb-16 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-3xl shadow-2xl overflow-hidden text-white relative">
+          <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-white opacity-10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-64 h-64 bg-purple-500 opacity-20 rounded-full blur-2xl"></div>
+          
+          <div className="relative px-8 py-12 md:p-16 text-center md:text-left flex flex-col md:flex-row items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold tracking-widest text-indigo-200 uppercase mb-3">RDBMS Project Submission</h2>
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">Dynamic Pricing Engine</h1>
+              <p className="text-indigo-100 text-lg max-w-xl">
+                A real-time database-driven pricing system demonstrating complex triggers, stored procedures, and event schedulers.
+              </p>
+            </div>
+            
+            <div className="mt-10 md:mt-0 bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl text-left min-w-[280px]">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-indigo-200 uppercase tracking-wider font-semibold">Submitted By</p>
+                  <p className="text-xl font-bold text-white">SHIVAM KUMAR</p>
+                </div>
+                <div className="flex gap-6">
+                  <div>
+                    <p className="text-xs text-indigo-200 uppercase tracking-wider font-semibold">Reg Number</p>
+                    <p className="text-lg font-medium text-white">2502051413</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-indigo-200 uppercase tracking-wider font-semibold">Section</p>
+                    <p className="text-lg font-medium text-white">J4</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-4">
-            Dynamic Pricing Store
-          </h1>
+          <h2 className="text-3xl font-bold text-gray-900 tracking-tight mb-4">
+            Live Store Demonstration
+          </h2>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto">
             Prices adapt in real-time based on supply and demand. Watch prices change as items get viewed and bought!
           </p>
