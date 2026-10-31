@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%239fe870'/%3E%3Ctext x='16' y='23' font-size='19' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%230e0f0c'%3E%E2%82%B9%3C/text%3E%3C/svg%3E" />
+<title>Dynamic Pricing — prices that move with demand</title>
+<meta name="description" content="A full-stack e-commerce demo where MySQL stored procedures and triggers recompute product prices from views, sales and stock." />
+<style>
+  :root{
+    /* Wise-inspired DESIGN.md tokens (site/DESIGN.md) */
+    --primary:#9fe870;
+    --on-primary:#0e0f0c;
+    --primary-active:#cdffad;
+    --primary-pale:#e2f6d5;
+    --primary-neutral:#c5edab;
+    --ink:#0e0f0c;
+    --ink-deep:#163300;
+    --body:#454745;
+    --mute:#868685;
+    --canvas:#ffffff;
+    --canvas-soft:#e8ebe6;
+    --positive:#2ead4b;
+    --positive-deep:#054d28;
+    --warning:#ffd11a;
+    --warning-content:#4a3b1c;
+    --negative:#d03238;
+    --negative-deep:#a72027;
+
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-pill:9999px;
+
+    --display: "Wise Sans","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --sans: "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono: ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+
+    --shadow-card:0 1px 2px rgba(14,15,12,.05), 0 12px 32px rgba(14,15,12,.06);
+    --measure:1080px;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.5;
+    color:var(--ink);
+    background:var(--canvas-soft);
+    text-wrap:pretty;
+  }
+  h1,h2,h3{margin:0;font-weight:900;letter-spacing:-.02em}
+  p{margin:0}
+  a{color:inherit}
+  :focus-visible{outline:3px solid var(--ink);outline-offset:3px;border-radius:6px}
+
+  .wrap{width:100%;max-width:var(--measure);margin:0 auto;padding:0 24px}
+  .eyebrow{
+    font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--body);display:flex;align-items:center;gap:8px;
+  }
+  .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 3px var(--primary-pale)}
+
+  /* ---------- nav ---------- */
+  .nav-shell{position:sticky;top:0;z-index:20;padding:16px 0;background:linear-gradient(var(--canvas-soft) 62%,transparent)}
+  .nav{
+    display:flex;align-items:center;gap:16px;justify-content:space-between;
+    background:var(--canvas);border-radius:var(--r-pill);padding:10px 12px 10px 20px;
+    box-shadow:var(--shadow-card);
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:-.03em;font-size:18px;text-decoration:none}
+  .brand-mark{
+    width:26px;height:26px;border-radius:8px;background:var(--primary);color:var(--on-primary);
+    display:grid;place-items:center;font-size:14px;font-weight:900;
+  }
+  .nav-links{display:none;gap:24px;font-size:14px;font-weight:600}
+  .nav-links a{text-decoration:none;color:var(--body)}
+  .nav-links a:hover{color:var(--ink)}
+  @media(min-width:860px){ .nav-links{display:flex} }
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    min-height:44px;padding:0 24px;border-radius:var(--r-pill);border:1px solid transparent;
+    font-family:var(--sans);font-size:16px;font-weight:600;text-decoration:none;cursor:pointer;
+    transition:background-color .16s ease, transform .16s ease, border-color .16s ease;
+  }
+  .btn-primary{background:var(--primary);color:var(--on-primary)}
+  .btn-primary:hover{background:var(--primary-active)}
+  .btn-primary:active{transform:translateY(1px)}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:rgba(14,15,12,.16)}
+  .btn-ghost:hover{background:var(--canvas);border-color:rgba(14,15,12,.3)}
+  .btn-sm{min-height:36px;padding:0 16px;font-size:14px}
+
+  /* ---------- hero ---------- */
+  .hero{padding:56px 0 24px}
+  .hero-grid{display:grid;grid-template-columns:1fr;gap:40px;align-items:center}
+  @media(min-width:960px){ .hero-grid{grid-template-columns:1.15fr .85fr;gap:56px} }
+
+  .hero h1{
+    font-family:var(--display);
+    font-weight:900;
+    font-size:clamp(44px,7.2vw,76px);
+    line-height:.94;
+    letter-spacing:-.035em;
+    margin:18px 0 20px;
+  }
+  .hero h1 em{font-style:normal;background:linear-gradient(transparent 62%,var(--primary) 62%,var(--primary) 92%,transparent 92%)}
+  .hero-sub{font-size:20px;line-height:1.5;color:var(--body);max-width:46ch}
+  .hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+  .stack-line{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:28px;font-family:var(--mono);
+    font-size:12px;color:var(--body);
+  }
+  .stack-line span{background:rgba(14,15,12,.06);border-radius:var(--r-pill);padding:5px 12px}
+
+  /* ---------- price card (live) ---------- */
+  .card{background:var(--canvas);border-radius:var(--r-xl);box-shadow:var(--shadow-card)}
+  .price-card{padding:24px;display:flex;flex-direction:column;gap:18px}
+  .price-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .product-name{font-size:15px;font-weight:600;max-width:22ch}
+  .sku{font-family:var(--mono);font-size:11px;color:#5f615f}
+  .price small{color:#5f615f}
+  .delta{
+    display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;
+    padding:6px 10px;border-radius:var(--r-pill);white-space:nowrap;
+    background:var(--primary-pale);color:var(--positive-deep);
+  }
+  .delta[data-dir="down"]{background:#fde8e8;color:var(--negative-deep)}
+  .delta[data-dir="flat"]{background:rgba(14,15,12,.06);color:var(--body)}
+  .price{font-family:var(--display);font-weight:900;font-size:clamp(38px,8vw,52px);line-height:1;letter-spacing:-.03em}
+  .price small{font-size:14px;font-weight:600;color:#5f615f;letter-spacing:0;display:block;margin-top:8px;font-family:var(--sans)}
+  .meter{display:grid;gap:10px;padding-top:4px;border-top:1px solid rgba(14,15,12,.08)}
+  .meter-row{display:grid;grid-template-columns:76px 1fr 72px;align-items:center;gap:12px;font-size:13px}
+  .meter-label{color:var(--body)}
+  .meter-val{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+  .bar{height:8px;border-radius:var(--r-pill);background:rgba(14,15,12,.08);overflow:hidden}
+  .bar > i{display:block;height:100%;border-radius:var(--r-pill);background:var(--ink);transition:width .3s ease}
+  .bar[data-kind="sold"] > i{background:var(--ink)}
+  .bar[data-kind="views"] > i{background:var(--positive)}
+  .bar[data-kind="stock"] > i{background:var(--warning)}
+  .card-foot{
+    display:flex;align-items:center;gap:8px;padding-top:14px;
+    border-top:1px solid rgba(14,15,12,.08);font-size:12px;color:var(--body);
+  }
+  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--positive);box-shadow:0 0 0 3px rgba(46,173,75,.16);flex:none}
+
+  /* ---------- sections ---------- */
+  section{padding:88px 0;scroll-margin-top:96px}
+  header.hero{scroll-margin-top:96px}
+  .section-head{display:grid;gap:14px;max-width:62ch;margin-bottom:40px}
+  .section-head h2{font-family:var(--display);font-weight:900;font-size:clamp(30px,4.4vw,44px);line-height:1.02;letter-spacing:-.03em}
+  .section-head p{font-size:18px;color:var(--body)}
+
+  .band-white{background:var(--canvas)}
+
+  /* simulator */
+  .sim{display:grid;grid-template-columns:1fr;gap:24px;align-items:stretch}
+  @media(min-width:900px){ .sim{grid-template-columns:1.05fr .95fr;gap:32px} }
+  .sim-panel{padding:28px}
+  .field{display:grid;gap:8px;margin-bottom:22px}
+  .field:last-child{margin-bottom:0}
+  .field-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .field label{font-size:14px;font-weight:600}
+  .field output{font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums;background:rgba(14,15,12,.06);border-radius:var(--r-sm);padding:2px 8px}
+  .field .hint{font-size:12px;color:var(--body)}
+  input[type="range"]{
+    -webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-pill);
+    background:linear-gradient(90deg,var(--ink) var(--fill,0%),rgba(14,15,12,.12) var(--fill,0%));
+    cursor:pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+    background:var(--canvas);border:3px solid var(--ink);box-shadow:0 2px 6px rgba(14,15,12,.2);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:18px;height:18px;border-radius:50%;background:var(--canvas);
+    border:3px solid var(--ink);box-shadow:0 2px 6px rgba(14,15,12,.2);
+  }
+
+  .breakdown{padding:28px;display:flex;flex-direction:column;gap:18px;background:var(--ink-deep);color:#f2f7ee}
+  .breakdown h3{font-size:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(242,247,238,.78)}
+  .bd-total{font-family:var(--display);font-weight:900;font-size:clamp(36px,7vw,46px);line-height:1;letter-spacing:-.03em}
+  .bd-total span{font-family:var(--mono);font-size:13px;font-weight:400;letter-spacing:0;color:rgba(242,247,238,.8);display:block;margin-top:10px}
+  .bd-rows{display:grid;gap:2px;border-top:1px solid rgba(242,247,238,.16);padding-top:14px}
+  .bd-row{display:grid;grid-template-columns:1fr auto;gap:14px;padding:9px 0;font-size:14px}
+  .bd-row span:first-child{color:rgba(242,247,238,.9)}
+  .bd-row b{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+  .bd-row.total{border-top:1px solid rgba(242,247,238,.16);margin-top:6px;padding-top:14px;font-weight:600}
+  .bd-row.total b{font-size:18px;color:var(--primary)}
+  .clamp-note{
+    display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.45;
+    background:rgba(255,209,26,.14);color:var(--warning);padding:12px 14px;border-radius:var(--r-md);
+  }
+  .clamp-note[hidden]{display:none}
+
+  /* flow */
+  .flow{display:grid;grid-template-columns:1fr;gap:16px;counter-reset:step}
+  @media(min-width:840px){ .flow{grid-template-columns:repeat(4,1fr)} }
+  .step{background:var(--canvas);border-radius:var(--r-lg);padding:22px;display:grid;gap:10px;align-content:start;box-shadow:var(--shadow-card)}
+  .step-n{font-family:var(--mono);font-size:12px;color:var(--mute)}
+  .step h3{font-size:16px;letter-spacing:-.01em}
+  .step p{font-size:14px;color:var(--body)}
+  .step code{font-family:var(--mono);font-size:12px;background:rgba(14,15,12,.06);border-radius:6px;padding:2px 6px;display:inline-block;word-break:break-word}
+
+  /* formula spec */
+  .spec{display:grid;gap:0;border-radius:var(--r-xl);overflow:hidden;background:var(--canvas);box-shadow:var(--shadow-card)}
+  .spec-row{display:grid;grid-template-columns:1fr auto;gap:16px;padding:20px 24px;border-bottom:1px solid rgba(14,15,12,.08);align-items:center}
+  .spec-row:last-child{border-bottom:0}
+  .spec-row .when{font-size:15px;color:var(--body)}
+  .spec-row .when strong{color:var(--ink);display:block;font-size:15px;margin-bottom:2px}
+  .spec-row .rate{font-family:var(--mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .spec-row .rate.up{color:var(--positive-deep)}
+  .spec-row .rate.down{color:var(--negative-deep)}
+  .caps{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;font-size:13px;color:var(--body)}
+  .caps span{border:1px dashed rgba(14,15,12,.24);border-radius:var(--r-pill);padding:6px 12px}
+
+  /* api */
+  .api{display:grid;gap:16px}
+  .endpoint{background:var(--canvas);border-radius:var(--r-lg);padding:22px 24px;box-shadow:var(--shadow-card);display:grid;gap:12px}
+  .endpoint-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+  .verb{
+    font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.04em;
+    padding:5px 10px;border-radius:6px;background:rgba(14,15,12,.06)
+  }
+  .verb[data-v="POST"]{background:var(--primary-pale);color:var(--positive-deep)}
+  .path{font-family:var(--mono);font-size:14px;font-weight:600;word-break:break-all}
+  .endpoint p{font-size:14px;color:var(--body)}
+  pre{
+    margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;
+    background:var(--canvas-soft);border-radius:var(--r-md);padding:14px 16px;overflow-x:auto;
+  }
+  .api-note{font-size:13px;color:var(--body);margin-top:8px}
+
+  /* footer */
+  footer{background:var(--ink);color:#f2f7ee;padding:56px 0 40px;margin-top:0}
+  .foot{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:flex-start}
+  .foot h3{font-family:var(--display);font-weight:900;font-size:28px;letter-spacing:-.02em;max-width:24ch;line-height:1.06}
+  .foot-links{display:grid;gap:8px;font-size:14px}
+  .foot-links a{color:rgba(242,247,238,.78);text-decoration:none}
+  .foot-links a:hover{color:var(--primary)}
+  .foot-base{margin-top:32px;padding-top:20px;border-top:1px solid rgba(242,247,238,.16);font-size:12.5px;color:rgba(242,247,238,.56);display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between}
+
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+  @media(prefers-reduced-motion:reduce){
+    *{transition:none !important;animation:none !important}
+  }
+</style>
+</head>
+<body>
+
+<div class="nav-shell">
+  <div class="wrap">
+    <nav class="nav" aria-label="Primary">
+      <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">₹</span> Dynamic Pricing</a>
+      <div class="nav-links">
+        <a href="#simulator">Simulator</a>
+        <a href="#engine">How it works</a>
+        <a href="#formula">Formula</a>
+        <a href="#api">API</a>
+      </div>
+      <a class="btn btn-primary btn-sm" href="https://github.com/godragnor1-ux/Dynamic-PricingWB" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</div>
+
+<main id="top">
+
+  <!-- ============ HERO ============ -->
+  <header class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">MySQL · Express · React</p>
+        <h1>Prices that move<br>with <em>demand</em>.</h1>
+        <p class="hero-sub">
+          An e-commerce demo where the database prices the product, not the code.
+          Views, sales and stock feed a stored procedure that rewrites every price on the next read.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#simulator">Run the simulator</a>
+          <a class="btn btn-ghost" href="#engine">See the engine</a>
+        </div>
+        <p class="stack-line">
+          <span>MySQL triggers</span>
+          <span>UpdateDynamicPrices()</span>
+          <span>Node 20</span>
+          <span>React + Tailwind</span>
+        </p>
+      </div>
+
+      <aside class="card price-card" aria-label="Live price example">
+        <div class="price-card-head">
+          <div>
+            <p class="product-name">Ultra-Slim 4K Monitor</p>
+            <p class="sku">SKU-003 · seeded high-demand item</p>
+          </div>
+          <span class="delta" id="heroDelta" data-dir="up">▲ +18.2%</span>
+        </div>
+        <div class="price">
+          <span id="heroPrice">₹420.00</span>
+          <small>was ₹399.50 base · recalculated on next read</small>
+        </div>
+        <div class="meter">
+          <div class="meter-row">
+            <span class="meter-label">Views</span>
+            <span class="bar" data-kind="views"><i id="heroViewsBar" style="width:60%"></i></span>
+            <span class="meter-val" id="heroViews">300</span>
+          </div>
+          <div class="meter-row">
+            <span class="meter-label">Sold</span>
+            <span class="bar" data-kind="sold"><i id="heroSoldBar" style="width:45%"></i></span>
+            <span class="meter-val" id="heroSold">45</span>
+          </div>
+          <div class="meter-row">
+            <span class="meter-label">In stock</span>
+            <span class="bar" data-kind="stock"><i id="heroStockBar" style="width:12%"></i></span>
+            <span class="meter-val" id="heroStock">15</span>
+          </div>
+        </div>
+        <p class="card-foot"><span class="live-dot" aria-hidden="true"></span> Simulated live from the four inputs the procedure reads</p>
+      </aside>
+    </div>
+  </header>
+
+  <!-- ============ SIMULATOR ============ -->
+  <section id="simulator" class="band-white">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Move the inputs. Watch the price.</h2>
+        <p>
+          These four numbers are the only ones the pricing procedure reads. Everything else in the store
+          is just presentation. Drag a slider and the price on the right is recomputed with the same rules
+          the database uses.
+        </p>
+      </div>
+
+      <div class="sim">
+        <div class="card sim-panel">
+          <div class="field">
+            <div class="field-top">
+              <label for="base">Base price</label>
+              <output id="baseOut" for="base">₹399.50</output>
+            </div>
+            <input id="base" type="range" min="50" max="2000" step="10" value="400" aria-describedby="baseHint">
+            <p class="hint" id="baseHint">The list price set by the seller before the engine touches it.</p>
+          </div>
+
+          <div class="field">
+            <div class="field-top">
+              <label for="stock">Units in stock</label>
+              <output id="stockOut" for="stock">48</output>
+            </div>
+            <input id="stock" type="range" min="0" max="200" step="1" value="48">
+            <p class="hint">Surplus pulls the price down: −0.5% for every unit left.</p>
+          </div>
+
+          <div class="field">
+            <div class="field-top">
+              <label for="sold">Units sold</label>
+              <output id="soldOut" for="sold">45</output>
+            </div>
+            <input id="sold" type="range" min="0" max="400" step="1" value="45">
+            <p class="hint">Demand pushes it up: +3% for every 5 sold.</p>
+          </div>
+
+          <div class="field">
+            <div class="field-top">
+              <label for="views">Product views</label>
+              <output id="viewsOut" for="views">320</output>
+            </div>
+            <input id="views" type="range" min="0" max="2000" step="10" value="320">
+            <p class="hint">Interest adds +0.1% for every 10 views.</p>
+          </div>
+        </div>
+
+        <div class="card breakdown" aria-live="polite">
+          <h3>Computed price</h3>
+          <p class="bd-total">
+            <span id="simPrice" style="display:block;font:inherit">₹420.00</span>
+            <span id="simMultiplier">multiplier ×1.18</span>
+          </p>
+
+          <div class="bd-rows">
+            <div class="bd-row"><span>Base price</span><b id="simBase">₹399.50</b></div>
+            <div class="bd-row"><span>Demand from sales</span><b id="simSold">+27.0%</b></div>
+            <div class="bd-row"><span>Demand from views</span><b id="simViews">+3.2%</b></div>
+            <div class="bd-row"><span>Stock discount</span><b id="simStock">−24.0%</b></div>
+            <div class="bd-row total"><span>Final price</span><b id="simFinal">₹420.00</b></div>
+          </div>
+
+          <p class="clamp-note" id="clampNote" hidden>
+            <span aria-hidden="true">⚑</span>
+            <span id="clampText">Clamped by the surge limit.</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ENGINE ============ -->
+  <section id="engine">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>The price is written in SQL, not in JavaScript.</h2>
+        <p>
+          Express only moves numbers in and out. Every recalculation is a stored procedure call inside MySQL,
+          so the same rules apply whether the storefront, a script, or an admin panel touches the row.
+        </p>
+      </div>
+
+      <div class="flow">
+        <article class="step">
+          <p class="step-n">01 / request</p>
+          <h3>A visit lands</h3>
+          <p>The storefront pings <code>POST /api/products/:id/view</code> when a product page opens.</p>
+        </article>
+        <article class="step">
+          <p class="step-n">02 / write</p>
+          <h3>Counter increments</h3>
+          <p><code>UPDATE Products SET views_count = views_count + 1</code> — one row, no reads.</p>
+        </article>
+        <article class="step">
+          <p class="step-n">03 / recompute</p>
+          <h3>Procedure runs</h3>
+          <p><code>CALL UpdateDynamicPrices()</code> rewrites <code>current_price</code> for every product at once.</p>
+        </article>
+        <article class="step">
+          <p class="step-n">04 / read</p>
+          <h3>New price serves</h3>
+          <p><code>GET /api/products</code> returns the row as-is — the API has no pricing logic to drift.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FORMULA ============ -->
+  <section id="formula" class="band-white">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Four rules, two hard limits.</h2>
+        <p>
+          The engine is deliberately boring: three linear signals on top of the base price, then a clamp so a
+          runaway counter can never produce an absurd listing.
+        </p>
+      </div>
+
+      <div class="spec">
+        <div class="spec-row">
+          <p class="when"><strong>Every 5 items sold</strong>Demand signal — buyers competing for the same unit.</p>
+          <p class="rate up">+3.0%</p>
+        </div>
+        <div class="spec-row">
+          <p class="when"><strong>Every 10 product views</strong>Interest signal — attention without a purchase yet.</p>
+          <p class="rate up">+0.1%</p>
+        </div>
+        <div class="spec-row">
+          <p class="when"><strong>Per unit still in stock</strong>Inventory drag — surplus makes the shelf cheaper.</p>
+          <p class="rate down">−0.5%</p>
+        </div>
+        <div class="spec-row">
+          <p class="when"><strong>Final multiplier</strong>Clamped before it is written back to <code>current_price</code>.</p>
+          <p class="rate">0.80 – 1.50</p>
+        </div>
+      </div>
+
+      <p class="caps">
+        <span>Max surge +50%</span>
+        <span>Max discount −20%</span>
+        <span>Prices stored in ₹</span>
+        <span>Recomputed per request, not on a cron</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ API ============ -->
+  <section id="api">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Three endpoints. No pricing code.</h2>
+        <p>Run the backend on port 5001 and the Vite storefront on 5174 — the API surface is this small.</p>
+      </div>
+
+      <div class="api">
+        <article class="endpoint">
+          <div class="endpoint-head">
+            <span class="verb" data-v="GET">GET</span>
+            <span class="path">/api/products</span>
+          </div>
+          <p>Returns every row from <code>Products</code> including <code>current_price</code>, <code>stock_quantity</code>, <code>views_count</code> and <code>sold_count</code>.</p>
+<pre>[
+  { "product_id": 3, "name": "Ultra-Slim 4K Monitor",
+    "base_price": 399.5, "current_price": 420.0,
+    "stock_quantity": 15, "views_count": 300, "sold_count": 45 }
+]</pre>
+        </article>
+
+        <article class="endpoint">
+          <div class="endpoint-head">
+            <span class="verb" data-v="POST">POST</span>
+            <span class="path">/api/products/:id/view</span>
+          </div>
+          <p>Increments the view counter, then forces <code>CALL UpdateDynamicPrices()</code> so the next read shows the new price. Returns 404 if the product does not exist.</p>
+<pre>{ "message": "View count incremented successfully" }</pre>
+        </article>
+
+        <article class="endpoint">
+          <div class="endpoint-head">
+            <span class="verb" data-v="POST">POST</span>
+            <span class="path">/api/checkout</span>
+          </div>
+          <p>Body <code>{ "productId": 3, "quantity": 2 }</code>. Runs inside a transaction: reads the price, rejects insufficient stock, writes the order, then recomputes prices.</p>
+<pre>{ "error": "Insufficient stock" }        // 400, transaction rolled back</pre>
+        </article>
+      </div>
+
+      <p class="api-note">
+        The simulator above mirrors the formula in the project README. The stored procedure in MySQL remains the
+        source of truth — if the two ever disagree, the database wins.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <h3>Dynamic Pricing Web App</h3>
+      <div class="foot-links">
+        <a href="https://github.com/godragnor1-ux/Dynamic-PricingWB" rel="noopener">Repository</a>
+        <a href="#simulator">Simulator</a>
+        <a href="#api">API reference</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>MySQL · Express · React · Tailwind</span>
+      <span>Designed with a Wise-inspired token set</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });
+
+  var els = {
+    base: document.getElementById("base"),
+    stock: document.getElementById("stock"),
+    sold: document.getElementById("sold"),
+    views: document.getElementById("views"),
+    baseOut: document.getElementById("baseOut"),
+    stockOut: document.getElementById("stockOut"),
+    soldOut: document.getElementById("soldOut"),
+    viewsOut: document.getElementById("viewsOut"),
+    price: document.getElementById("simPrice"),
+    mult: document.getElementById("simMultiplier"),
+    simBase: document.getElementById("simBase"),
+    simSold: document.getElementById("simSold"),
+    simViews: document.getElementById("simViews"),
+    simStock: document.getElementById("simStock"),
+    simFinal: document.getElementById("simFinal"),
+    clampNote: document.getElementById("clampNote"),
+    clampText: document.getElementById("clampText")
+  };
+
+  var FLOOR = 0.80, CEIL = 1.50;
+
+  function pct(v) {
+    var s = (Math.abs(v) * 100).toFixed(1) + "%";
+    return (v < 0 ? "−" : v > 0 ? "+" : "±") + s;
+  }
+
+  // rules as documented in the project README
+  function compute(base, stock, sold, views) {
+    var fromSold = Math.floor(sold / 5) * 0.03;
+    var fromViews = Math.floor(views / 10) * 0.001;
+    var fromStock = -Math.floor(stock) * 0.005;
+    var raw = 1 + fromSold + fromViews + fromStock;
+    var clamped = Math.min(CEIL, Math.max(FLOOR, raw));
+    return {
+      base: base, fromSold: fromSold, fromViews: fromViews, fromStock: fromStock,
+      raw: raw, mult: clamped, price: base * clamped,
+      clampedLow: raw < FLOOR, clampedHigh: raw > CEIL
+    };
+  }
+
+  function paintSlider(input) {
+    var min = parseFloat(input.min), max = parseFloat(input.max), v = parseFloat(input.value);
+    var f = max === min ? 0 : (v - min) / (max - min);
+    input.style.setProperty("--fill", (f * 100).toFixed(1) + "%");
+  }
+
+  function render() {
+    var base = parseFloat(els.base.value);
+    var stock = parseFloat(els.stock.value);
+    var sold = parseFloat(els.sold.value);
+    var views = parseFloat(els.views.value);
+
+    var r = compute(base, stock, sold, views);
+
+    els.baseOut.textContent = money.format(base);
+    els.stockOut.textContent = String(stock);
+    els.soldOut.textContent = String(sold);
+    els.viewsOut.textContent = String(views);
+
+    els.price.textContent = money.format(r.price);
+    els.mult.textContent = "multiplier ×" + r.mult.toFixed(3);
+    els.simBase.textContent = money.format(base);
+    els.simSold.textContent = pct(r.fromSold);
+    els.simViews.textContent = pct(r.fromViews);
+    els.simStock.textContent = pct(r.fromStock);
+    els.simFinal.textContent = money.format(r.price);
+
+    if (r.clampedHigh) {
+      els.clampNote.hidden = false;
+      els.clampText.textContent = "Raw multiplier " + r.raw.toFixed(2) + " exceeded the +50% surge cap — held at ×1.50.";
+    } else if (r.clampedLow) {
+      els.clampNote.hidden = false;
+      els.clampText.textContent = "Raw multiplier " + r.raw.toFixed(2) + " fell past the −20% floor — held at ×0.80.";
+    } else {
+      els.clampNote.hidden = true;
+    }
+
+    [els.base, els.stock, els.sold, els.views].forEach(paintSlider);
+
+    // hero card mirrors the simulator so the page never shows two different prices
+    var delta = (r.mult - 1) * 100;
+    var heroDelta = document.getElementById("heroDelta");
+    heroDelta.textContent = (delta >= 0 ? "▲ +" : "▼ ") + delta.toFixed(1) + "%";
+    heroDelta.dataset.dir = delta > 0.05 ? "up" : delta < -0.05 ? "down" : "flat";
+    document.getElementById("heroPrice").textContent = money.format(r.price);
+    document.getElementById("heroViews").textContent = String(views);
+    document.getElementById("heroSold").textContent = String(sold);
+    document.getElementById("heroStock").textContent = String(stock);
+    document.getElementById("heroViewsBar").style.width = Math.min(100, (views / 2000) * 100) + "%";
+    document.getElementById("heroSoldBar").style.width = Math.min(100, (sold / 400) * 100) + "%";
+    document.getElementById("heroStockBar").style.width = Math.min(100, (stock / 200) * 100) + "%";
+  }
+
+  [els.base, els.stock, els.sold, els.views].forEach(function (input) {
+    input.addEventListener("input", render);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
